@@ -36,8 +36,6 @@ class InventoryScreen extends StatefulWidget {
 class _InventoryScreenState extends State<InventoryScreen> {
   static const EventChannel _clipboardChannel = EventChannel('scan_erp/clipboard_stream');
   final List<ScannedItem> _scannedItems = [];
-  final TextEditingController _controller = TextEditingController();
-  final FocusNode _focusNode = FocusNode();
   bool _isBlockScanner = false;
   StreamSubscription<dynamic>? _clipboardSubscription;
   ScannedItem? _lastItem;
@@ -66,8 +64,6 @@ class _InventoryScreenState extends State<InventoryScreen> {
     });
   }
 
-  void _initFocus() => Future.delayed(const Duration(milliseconds: 600), () => _requestFocus());
-  void _requestFocus() { if (mounted) _focusNode.requestFocus(); }
 
   void _processCode(String rawCode) {
     if (_isBlockScanner) return;
@@ -94,16 +90,12 @@ class _InventoryScreenState extends State<InventoryScreen> {
         _lastItem = newItem;
       }
       
-      // В режиме Clipboard лучше очищать контроллер вот так:
-      _controller.value = TextEditingValue.empty;
     });
 
     // Блокировка на 500мс (вместо 1000мс), так как в буфере нет «дребезга» клавиш
     Future.delayed(const Duration(milliseconds: 500), () {
       if (mounted) {
-        _controller.clear(); 
         setState(() => _isBlockScanner = false);
-        _requestFocus();
       }
     });
   }
@@ -178,7 +170,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
           ],
         ),
       ),
-    ).then((_) => _requestFocus());
+    );
   }
 
   @override
@@ -203,10 +195,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () async {
-          // Сначала снимаем фокус, чтобы клавиатура/сканер не мешали диалогу
-          _focusNode.unfocus(); 
           await ExportService.exportToInventoryJson(_scannedItems);
-          _requestFocus(); // Возвращаем фокус после закрытия диалога
         },
         backgroundColor: const Color(0xFF003387),
         child: const Icon(Icons.save, color: Colors.white),
@@ -294,7 +283,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
       title: const Text('Очистить всё?'),
       actions: [
         TextButton(onPressed: () => Navigator.pop(context), child: const Text('ОТМЕНА')),
-        TextButton(onPressed: () { setState(() { _scannedItems.clear(); _lastItem = null; }); Navigator.pop(context); _requestFocus(); }, child: const Text('УДАЛИТЬ', style: TextStyle(color: Colors.red))),
+        TextButton(onPressed: () { setState(() { _scannedItems.clear(); _lastItem = null; }); Navigator.pop(context); }, child: const Text('УДАЛИТЬ', style: TextStyle(color: Colors.red))),
       ],
     ));
   }
