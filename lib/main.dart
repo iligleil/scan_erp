@@ -46,27 +46,6 @@ class _InventoryScreenState extends State<InventoryScreen> {
     _listenClipboardScanner();
   }
 
-  @override
-  void dispose() {
-    _clipboardSubscription?.cancel();
-    super.dispose();
-  }
-
-  void _listenClipboardScanner() {
-    _clipboardSubscription = _clipboardChannel.receiveBroadcastStream().listen(
-      (dynamic data) {
-        if (!mounted) return;
-
-        final value = data?.toString().trim() ?? '';
-        if (value.isNotEmpty) {
-          _processCode(value);
-        }
-      },
-      onError: (Object error) {
-        debugPrint('Clipboard stream error: $error');
-      },
-    );
-  }
 
   void _processCode(String rawCode) {
     if (_isBlockScanner) return;
