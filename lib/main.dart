@@ -34,21 +34,39 @@ class InventoryScreen extends StatefulWidget {
 }
 
 class _InventoryScreenState extends State<InventoryScreen> {
+  static const EventChannel _clipboardChannel = EventChannel('scan_erp/clipboard_stream');
   final List<ScannedItem> _scannedItems = [];
-  final TextEditingController _controller = TextEditingController();
-  final FocusNode _focusNode = FocusNode();
   bool _isBlockScanner = false;
-  Timer? _debounce;
+  StreamSubscription<dynamic>? _clipboardSubscription;
   ScannedItem? _lastItem;
 
   @override
   void initState() {
     super.initState();
-    _initFocus();
+    _listenClipboardScanner();
   }
 
-  void _initFocus() => Future.delayed(const Duration(milliseconds: 600), () => _requestFocus());
-  void _requestFocus() { if (mounted) _focusNode.requestFocus(); }
+  @override
+  void dispose() {
+    _clipboardSubscription?.cancel();
+    super.dispose();
+  }
+
+  void _listenClipboardScanner() {
+    _clipboardSubscription = _clipboardChannel.receiveBroadcastStream().listen(
+      (dynamic data) {
+        if (!mounted) return;
+
+        final value = data?.toString().trim() ?? '';
+        if (value.isNotEmpty) {
+          _processCode(value);
+        }
+      },
+      onError: (Object error) {
+        debugPrint('Clipboard stream error: $error');
+      },
+    );
+  }
 
   void _processCode(String rawCode) {
     if (_isBlockScanner) return;
@@ -64,24 +82,23 @@ class _InventoryScreenState extends State<InventoryScreen> {
         _scannedItems[idx].quantity++;
         final item = _scannedItems.removeAt(idx);
         _scannedItems.insert(0, item);
+        _lastItem = item;
       } else {
-        _scannedItems.insert(0, ScannedItem(
+        final newItem = ScannedItem(
           fullContent: result['cleanJson'], 
           displayTitle: result['title'], 
           quantity: 1
-        ));
+        );
+        _scannedItems.insert(0, newItem);
+        _lastItem = newItem;
       }
       
-      // В режиме Clipboard лучше очищать контроллер вот так:
-      _controller.value = TextEditingValue.empty;
     });
 
     // Блокировка на 500мс (вместо 1000мс), так как в буфере нет «дребезга» клавиш
     Future.delayed(const Duration(milliseconds: 500), () {
       if (mounted) {
-        _controller.clear(); 
         setState(() => _isBlockScanner = false);
-        _requestFocus();
       }
     });
   }
@@ -156,7 +173,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
           ],
         ),
       ),
-    ).then((_) => _requestFocus());
+    );
   }
 
   @override
@@ -181,10 +198,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () async {
-          // Сначала снимаем фокус, чтобы клавиатура/сканер не мешали диалогу
-          _focusNode.unfocus(); 
           await ExportService.exportToInventoryJson(_scannedItems);
-          _requestFocus(); // Возвращаем фокус после закрытия диалога
         },
         backgroundColor: const Color(0xFF003387),
         child: const Icon(Icons.save, color: Colors.white),
@@ -193,60 +207,41 @@ class _InventoryScreenState extends State<InventoryScreen> {
   }
 
   Widget _buildScannerInput() {
-  return Padding(
-    padding: const EdgeInsets.all(16),
-    child: RawKeyboardListener(
-      focusNode: FocusNode(), // Отдельный узел для прослушки клавиш
-      onKey: (RawKeyEvent event) {
-        // Если сканер прислал "Enter" (LF) в конце
-        if (event is RawKeyDownEvent && 
-            (event.logicalKey == LogicalKeyboardKey.enter || 
-             event.logicalKey == LogicalKeyboardKey.numpadEnter)) {
-          if (_controller.text.isNotEmpty) {
-            _processCode(_controller.text);
-          }
-        }
-      },
-      child: TextField(
-        controller: _controller,
-        focusNode: _focusNode,
-        autofocus: true,
-        // Оставляем TextInputType.text, но скрываем клавиатуру. 
-        // Это важно, чтобы система не блокировала ввод из буфера.
-        keyboardType: TextInputType.text,
-        maxLines: 1,
-        showCursor: true,
+    final border = OutlineInputBorder(
+      borderRadius: BorderRadius.circular(15),
+      borderSide: const BorderSide(color: Color(0xFF43B02A), width: 2),
+    );
+
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: InputDecorator(
         decoration: InputDecoration(
           labelText: _isBlockScanner ? 'ПРИНЯТО' : 'СКАНЕР ГОТОВ (CLIPBOARD)',
           labelStyle: TextStyle(
             color: _isBlockScanner ? Colors.orange : const Color(0xFF43B02A),
-            fontWeight: FontWeight.bold
+            fontWeight: FontWeight.bold,
           ),
+          helperText: 'Сканер передает данные через буфер обмена автоматически',
           filled: true,
           fillColor: _isBlockScanner ? Colors.orange.shade50 : const Color(0xFFF6FFF4),
           prefixIcon: Icon(
-            Icons.qr_code_scanner, 
-            color: _isBlockScanner ? Colors.orange : const Color(0xFF43B02A)
+            Icons.qr_code_scanner,
+            color: _isBlockScanner ? Colors.orange : const Color(0xFF43B02A),
           ),
-          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: const BorderSide(color: Color(0xFF43B02A), width: 2)),
-          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: const BorderSide(color: Color(0xFF43B02A), width: 2.5)),
+          enabledBorder: border,
+          focusedBorder: border,
+          disabledBorder: border,
         ),
-        onChanged: (val) {
-          if (_isBlockScanner || val.isEmpty) return;
-
-          // Если в строке уже есть полный JSON (Clipboard вставил всё сразу)
-          if (val.contains('{') && val.contains('}')) {
-            _processCode(val); 
-          }
-        },
-        // Дополнительная подстраховка для терминатора LF
-        onSubmitted: (val) {
-          if (val.isNotEmpty) _processCode(val);
-        },
+        child: const SizedBox(
+          height: 20,
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Text('Ожидание скана...'),
+          ),
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 
   Widget _buildItemList() {
     return ListView.builder(
@@ -291,7 +286,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
       title: const Text('Очистить всё?'),
       actions: [
         TextButton(onPressed: () => Navigator.pop(context), child: const Text('ОТМЕНА')),
-        TextButton(onPressed: () { setState(() { _scannedItems.clear(); _lastItem = null; }); Navigator.pop(context); _requestFocus(); }, child: const Text('УДАЛИТЬ', style: TextStyle(color: Colors.red))),
+        TextButton(onPressed: () { setState(() { _scannedItems.clear(); _lastItem = null; }); Navigator.pop(context); }, child: const Text('УДАЛИТЬ', style: TextStyle(color: Colors.red))),
       ],
     ));
   }
