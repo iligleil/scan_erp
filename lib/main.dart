@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -34,36 +33,23 @@ class InventoryScreen extends StatefulWidget {
 }
 
 class _InventoryScreenState extends State<InventoryScreen> {
-  static const EventChannel _clipboardChannel = EventChannel('scan_erp/clipboard_stream');
   final List<ScannedItem> _scannedItems = [];
   final TextEditingController _controller = TextEditingController();
   final FocusNode _focusNode = FocusNode();
   bool _isBlockScanner = false;
-  StreamSubscription<dynamic>? _clipboardSubscription;
   ScannedItem? _lastItem;
 
   @override
   void initState() {
     super.initState();
     _initFocus();
-    _listenClipboardScanner();
   }
 
   @override
   void dispose() {
-    _clipboardSubscription?.cancel();
     _controller.dispose();
     _focusNode.dispose();
     super.dispose();
-  }
-
-  void _listenClipboardScanner() {
-    _clipboardSubscription = _clipboardChannel.receiveBroadcastStream().listen((dynamic data) {
-      final value = data?.toString().trim() ?? '';
-      if (value.isNotEmpty) {
-        _processCode(value);
-      }
-    });
   }
 
   void _initFocus() => Future.delayed(const Duration(milliseconds: 600), () => _requestFocus());
@@ -94,11 +80,9 @@ class _InventoryScreenState extends State<InventoryScreen> {
         _lastItem = newItem;
       }
       
-      // В режиме Clipboard лучше очищать контроллер вот так:
       _controller.value = TextEditingValue.empty;
     });
 
-    // Блокировка на 500мс (вместо 1000мс), так как в буфере нет «дребезга» клавиш
     Future.delayed(const Duration(milliseconds: 500), () {
       if (mounted) {
         _controller.clear(); 
@@ -221,17 +205,24 @@ class _InventoryScreenState extends State<InventoryScreen> {
         controller: _controller,
         focusNode: _focusNode,
         autofocus: true,
-        readOnly: true,
+        readOnly: false,
         enableInteractiveSelection: false,
         showCursor: false,
         maxLines: 1,
+        keyboardType: TextInputType.none,
+        textInputAction: TextInputAction.done,
+        onSubmitted: (value) {
+          final code = value.trim();
+          if (code.isEmpty) return;
+          _processCode(code);
+        },
         decoration: InputDecoration(
-          labelText: _isBlockScanner ? 'ПРИНЯТО' : 'СКАНЕР ГОТОВ (CLIPBOARD)',
+          labelText: _isBlockScanner ? 'ПРИНЯТО' : 'СКАНЕР ГОТОВ',
           labelStyle: TextStyle(
             color: _isBlockScanner ? Colors.orange : const Color(0xFF43B02A),
             fontWeight: FontWeight.bold,
           ),
-          helperText: 'ТСД отправляет данные через буфер обмена автоматически',
+          helperText: 'ТСД отправляет данные как ввод с клавиатуры',
           filled: true,
           fillColor: _isBlockScanner ? Colors.orange.shade50 : const Color(0xFFF6FFF4),
           prefixIcon: Icon(
