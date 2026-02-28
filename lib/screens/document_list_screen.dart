@@ -62,7 +62,7 @@ class _DocumentListScreenState extends State<DocumentListScreen> {
                 )
               : ListView.separated(
                   itemCount: _documents.length,
-                  separatorBuilder: (_, _) => const SizedBox(height: 6),
+                  separatorBuilder: (_, __) => const SizedBox(height: 6),
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                   itemBuilder: (context, index) {
                     final doc = _documents[index];

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -16,18 +18,21 @@ class ScanScreen extends StatefulWidget {
 }
 
 class _ScanScreenState extends State<ScanScreen> {
+  static const EventChannel _clipboardChannel = EventChannel('scan_erp/clipboard_stream');
   final List<ScannedItem> _scannedItems = [];
   final TextEditingController _controller = TextEditingController();
   final FocusNode _focusNode = FocusNode();
   bool _isBlockScanner = false;
   ScannedItem? _lastItem;
   bool _isLoading = true;
+  StreamSubscription<dynamic>? _clipboardSubscription;
 
   @override
   void initState() {
     super.initState();
     _loadDocument();
     _initFocus();
+    _listenClipboardScanner();
   }
 
   Future<void> _loadDocument() async {
@@ -43,9 +48,19 @@ class _ScanScreenState extends State<ScanScreen> {
 
   @override
   void dispose() {
+    _clipboardSubscription?.cancel();
     _controller.dispose();
     _focusNode.dispose();
     super.dispose();
+  }
+
+  void _listenClipboardScanner() {
+    _clipboardSubscription = _clipboardChannel.receiveBroadcastStream().listen((dynamic data) {
+      final value = data?.toString().trim() ?? '';
+      if (value.isNotEmpty) {
+        _processCode(value);
+      }
+    });
   }
 
   void _initFocus() => Future.delayed(const Duration(milliseconds: 600), _requestFocus);
