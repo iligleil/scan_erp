@@ -1,9 +1,11 @@
 package com.example.scan_erp
 
 import android.content.ClipData
+import android.content.ClipDescription
 import android.content.ClipboardManager
 import android.content.Context
 import android.os.Build
+import android.os.PersistableBundle
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.EventChannel
@@ -44,11 +46,14 @@ class MainActivity: FlutterActivity(), EventChannel.StreamHandler {
     }
 
     private fun clearClipboardSilently(manager: ClipboardManager) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            manager.clearPrimaryClip()
-            return
+        val clip = ClipData.newPlainText("", "")
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            clip.description.extras = PersistableBundle().apply {
+                putBoolean(ClipDescription.EXTRA_IS_SENSITIVE, true)
+            }
         }
 
-        manager.setPrimaryClip(ClipData.newPlainText("", ""))
+        manager.setPrimaryClip(clip)
     }
 }

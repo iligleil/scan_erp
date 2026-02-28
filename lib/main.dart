@@ -43,12 +43,15 @@ class _InventoryScreenState extends State<InventoryScreen> {
   @override
   void initState() {
     super.initState();
+    _initFocus();
     _listenClipboardScanner();
   }
 
   @override
   void dispose() {
     _clipboardSubscription?.cancel();
+    _controller.dispose();
+    _focusNode.dispose();
     super.dispose();
   }
 
@@ -201,36 +204,36 @@ class _InventoryScreenState extends State<InventoryScreen> {
   }
 
   Widget _buildScannerInput() {
-    final border = OutlineInputBorder(
-      borderRadius: BorderRadius.circular(15),
-      borderSide: const BorderSide(color: Color(0xFF43B02A), width: 2),
-    );
-
     return Padding(
       padding: const EdgeInsets.all(16),
-      child: InputDecorator(
+      child: TextField(
+        controller: _controller,
+        focusNode: _focusNode,
+        autofocus: true,
+        readOnly: true,
+        enableInteractiveSelection: false,
+        showCursor: false,
+        maxLines: 1,
         decoration: InputDecoration(
           labelText: _isBlockScanner ? 'ПРИНЯТО' : 'СКАНЕР ГОТОВ (CLIPBOARD)',
           labelStyle: TextStyle(
             color: _isBlockScanner ? Colors.orange : const Color(0xFF43B02A),
             fontWeight: FontWeight.bold,
           ),
-          helperText: 'Сканер передает данные через буфер обмена автоматически',
+          helperText: 'ТСД отправляет данные через буфер обмена автоматически',
           filled: true,
           fillColor: _isBlockScanner ? Colors.orange.shade50 : const Color(0xFFF6FFF4),
           prefixIcon: Icon(
             Icons.qr_code_scanner,
             color: _isBlockScanner ? Colors.orange : const Color(0xFF43B02A),
           ),
-          enabledBorder: border,
-          focusedBorder: border,
-          disabledBorder: border,
-        ),
-        child: const SizedBox(
-          height: 20,
-          child: Align(
-            alignment: Alignment.centerLeft,
-            child: Text('Ожидание скана...'),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(15),
+            borderSide: const BorderSide(color: Color(0xFF43B02A), width: 2),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(15),
+            borderSide: const BorderSide(color: Color(0xFF43B02A), width: 2.5),
           ),
         ),
       ),
