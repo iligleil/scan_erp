@@ -34,34 +34,15 @@ class InventoryScreen extends StatefulWidget {
 }
 
 class _InventoryScreenState extends State<InventoryScreen> {
-  static const EventChannel _clipboardChannel = EventChannel('scan_erp/clipboard_stream');
   final List<ScannedItem> _scannedItems = [];
   bool _isBlockScanner = false;
-  StreamSubscription<dynamic>? _clipboardSubscription;
+  Timer? _debounce;
   ScannedItem? _lastItem;
 
   @override
   void initState() {
     super.initState();
     _initFocus();
-    _listenClipboardScanner();
-  }
-
-  @override
-  void dispose() {
-    _clipboardSubscription?.cancel();
-    _controller.dispose();
-    _focusNode.dispose();
-    super.dispose();
-  }
-
-  void _listenClipboardScanner() {
-    _clipboardSubscription = _clipboardChannel.receiveBroadcastStream().listen((dynamic data) {
-      final value = data?.toString().trim() ?? '';
-      if (value.isNotEmpty) {
-        _processCode(value);
-      }
-    });
   }
 
 
@@ -79,15 +60,12 @@ class _InventoryScreenState extends State<InventoryScreen> {
         _scannedItems[idx].quantity++;
         final item = _scannedItems.removeAt(idx);
         _scannedItems.insert(0, item);
-        _lastItem = item;
       } else {
-        final newItem = ScannedItem(
+        _scannedItems.insert(0, ScannedItem(
           fullContent: result['cleanJson'], 
           displayTitle: result['title'], 
           quantity: 1
-        );
-        _scannedItems.insert(0, newItem);
-        _lastItem = newItem;
+        ));
       }
       
     });
@@ -204,41 +182,60 @@ class _InventoryScreenState extends State<InventoryScreen> {
   }
 
   Widget _buildScannerInput() {
-    return Padding(
-      padding: const EdgeInsets.all(16),
+  return Padding(
+    padding: const EdgeInsets.all(16),
+    child: RawKeyboardListener(
+      focusNode: FocusNode(), // Отдельный узел для прослушки клавиш
+      onKey: (RawKeyEvent event) {
+        // Если сканер прислал "Enter" (LF) в конце
+        if (event is RawKeyDownEvent && 
+            (event.logicalKey == LogicalKeyboardKey.enter || 
+             event.logicalKey == LogicalKeyboardKey.numpadEnter)) {
+          if (_controller.text.isNotEmpty) {
+            _processCode(_controller.text);
+          }
+        }
+      },
       child: TextField(
         controller: _controller,
         focusNode: _focusNode,
         autofocus: true,
-        readOnly: true,
-        enableInteractiveSelection: false,
-        showCursor: false,
+        // Оставляем TextInputType.text, но скрываем клавиатуру. 
+        // Это важно, чтобы система не блокировала ввод из буфера.
+        keyboardType: TextInputType.text,
         maxLines: 1,
+        showCursor: true,
         decoration: InputDecoration(
           labelText: _isBlockScanner ? 'ПРИНЯТО' : 'СКАНЕР ГОТОВ (CLIPBOARD)',
           labelStyle: TextStyle(
             color: _isBlockScanner ? Colors.orange : const Color(0xFF43B02A),
-            fontWeight: FontWeight.bold,
+            fontWeight: FontWeight.bold
           ),
-          helperText: 'ТСД отправляет данные через буфер обмена автоматически',
           filled: true,
           fillColor: _isBlockScanner ? Colors.orange.shade50 : const Color(0xFFF6FFF4),
           prefixIcon: Icon(
-            Icons.qr_code_scanner,
-            color: _isBlockScanner ? Colors.orange : const Color(0xFF43B02A),
+            Icons.qr_code_scanner, 
+            color: _isBlockScanner ? Colors.orange : const Color(0xFF43B02A)
           ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(15),
-            borderSide: const BorderSide(color: Color(0xFF43B02A), width: 2),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(15),
-            borderSide: const BorderSide(color: Color(0xFF43B02A), width: 2.5),
-          ),
+          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: const BorderSide(color: Color(0xFF43B02A), width: 2)),
+          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: const BorderSide(color: Color(0xFF43B02A), width: 2.5)),
         ),
+        onChanged: (val) {
+          if (_isBlockScanner || val.isEmpty) return;
+
+          // Если в строке уже есть полный JSON (Clipboard вставил всё сразу)
+          if (val.contains('{') && val.contains('}')) {
+            _processCode(val); 
+          }
+        },
+        // Дополнительная подстраховка для терминатора LF
+        onSubmitted: (val) {
+          if (val.isNotEmpty) _processCode(val);
+        },
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildItemList() {
     return ListView.builder(
