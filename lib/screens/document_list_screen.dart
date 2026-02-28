@@ -63,14 +63,15 @@ class _DocumentListScreenState extends State<DocumentListScreen> {
               : ListView.separated(
                   itemCount: _documents.length,
                   separatorBuilder: (_, __) => const SizedBox(height: 6),
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                   itemBuilder: (context, index) {
                     final doc = _documents[index];
                     // Используем doc.name вместо doc.id, так как имя файла уникально
-                    final String documentKey = doc.name; 
+                    final String documentKey = doc.name;
 
                     return Dismissible(
-                      key: Key(documentKey), 
+                      key: Key(documentKey),
                       direction: DismissDirection.endToStart,
                       background: Container(
                         alignment: Alignment.centerRight,
@@ -83,15 +84,19 @@ class _DocumentListScreenState extends State<DocumentListScreen> {
                           context: context,
                           builder: (context) => AlertDialog(
                             title: const Text('Удалить документ?'),
-                            content: Text('Вы уверены, что хотите удалить "${doc.name}"?'),
+                            content: Text(
+                                'Вы уверены, что хотите удалить "${doc.name}"?'),
                             actions: [
                               TextButton(
-                                onPressed: () => Navigator.of(context).pop(false),
+                                onPressed: () =>
+                                    Navigator.of(context).pop(false),
                                 child: const Text('ОТМЕНА'),
                               ),
                               TextButton(
-                                onPressed: () => Navigator.of(context).pop(true),
-                                child: const Text('УДАЛИТЬ', style: TextStyle(color: Colors.red)),
+                                onPressed: () =>
+                                    Navigator.of(context).pop(true),
+                                child: const Text('УДАЛИТЬ',
+                                    style: TextStyle(color: Colors.red)),
                               ),
                             ],
                           ),
@@ -102,24 +107,28 @@ class _DocumentListScreenState extends State<DocumentListScreen> {
                         final deletedName = doc.name;
 
                         // Удаляем через сервис (используем doc.name как идентификатор файла)
-                        await DocumentStorageService.deleteDocument(doc.name);
-                        
+                        await DocumentStorageService.deleteDocument(doc.path);
+
                         setState(() {
                           _documents.removeAt(index);
                         });
 
                         // Проверка mounted для исправления ошибки BuildContext
                         if (!mounted) return;
-                        
+
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Документ "$deletedName" удален')),
+                          SnackBar(
+                              content: Text('Документ "$deletedName" удален')),
                         );
                       },
                       child: Card(
                         child: ListTile(
                           onTap: () => _openDocument(doc),
-                          leading: const Icon(Icons.description_outlined, color: Color(0xFF003387)),
-                          title: Text(doc.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                          leading: const Icon(Icons.description_outlined,
+                              color: Color(0xFF003387)),
+                          title: Text(doc.name,
+                              style:
+                                  const TextStyle(fontWeight: FontWeight.bold)),
                           subtitle: Text(
                             'Позиций: ${doc.itemCount} · Обновлён: ${_formatDate(doc.updatedAt)}',
                           ),

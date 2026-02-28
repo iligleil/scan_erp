@@ -15,7 +15,8 @@ class ExportService {
           details = jsonDecode(item.fullContent);
         } catch (e) {
           // Если JSON битый, пытаемся вытащить GUID регуляркой
-          RegExp guidRegex = RegExp(r'"GUID":\s*"([^"]+)"', caseSensitive: false);
+          RegExp guidRegex =
+              RegExp(r'"GUID":\s*"([^"]+)"', caseSensitive: false);
           RegExp orgRegex = RegExp(r'"ORG":\s*"([^"]+)"', caseSensitive: false);
           details = {
             "ORG": orgRegex.firstMatch(item.fullContent)?.group(1) ?? "",
@@ -31,12 +32,14 @@ class ExportService {
         };
       }).toList();
 
-      String jsonString = const JsonEncoder.withIndent('  ').convert(exportData);
+      String jsonString =
+          const JsonEncoder.withIndent('  ').convert(exportData);
       Uint8List bytes = Uint8List.fromList(utf8.encode(jsonString));
 
       // 2. Имя файла
       final now = DateTime.now();
-      String timestamp = "${now.year}${now.month}${now.day}_${now.hour}${now.minute}";
+      String timestamp =
+          "${now.year}${now.month}${now.day}_${now.hour}${now.minute}";
       String fileName = "inventory_$timestamp.json";
 
       // 3. Сохранение через системный диалог (самый стабильный метод)

@@ -12,14 +12,15 @@ class DocumentStorageService {
 
   static Future<Directory> _getPublicFolder() async {
     Directory? baseDir;
-    
+
     if (Platform.isAndroid) {
       // Путь, который 100% виден через USB (папка Загрузки)
       baseDir = Directory('/storage/emulated/0/Download/$_folderName');
     } else {
       // Для iOS или эмулятора используем стандарт
       final appDir = await getApplicationDocumentsDirectory();
-      baseDir = Directory('${appDir.path}${Platform.pathSeparator}$_folderName');
+      baseDir =
+          Directory('${appDir.path}${Platform.pathSeparator}$_folderName');
     }
 
     if (!await baseDir.exists()) {
@@ -34,12 +35,14 @@ class DocumentStorageService {
 
   static Future<List<InventoryDocument>> listDocuments() async {
     final folder = await _getDocumentsFolder();
-    final entities = await folder.list().where((e) => e.path.endsWith('.json')).toList();
+    final entities =
+        await folder.list().where((e) => e.path.endsWith('.json')).toList();
 
     final docs = <InventoryDocument>[];
     for (final entity in entities.whereType<File>()) {
       try {
-        final data = jsonDecode(await entity.readAsString()) as Map<String, dynamic>;
+        final data =
+            jsonDecode(await entity.readAsString()) as Map<String, dynamic>;
         final itemCount = (data['items'] as List<dynamic>? ?? const []).length;
         docs.add(
           InventoryDocument(
@@ -69,11 +72,13 @@ class DocumentStorageService {
   static Future<InventoryDocument> createDocument() async {
     final folder = await _getDocumentsFolder();
     final now = DateTime.now();
-    final id = '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}_'
+    final id =
+        '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}_'
         '${now.hour.toString().padLeft(2, '0')}${now.minute.toString().padLeft(2, '0')}${now.second.toString().padLeft(2, '0')}';
 
     final defaultName = 'Документ $id';
-    final file = File('${folder.path}${Platform.pathSeparator}document_$id.json');
+    final file =
+        File('${folder.path}${Platform.pathSeparator}document_$id.json');
 
     await file.writeAsString(
       const JsonEncoder.withIndent('  ').convert({
@@ -84,7 +89,21 @@ class DocumentStorageService {
     );
 
     await notifyMediaScanner(file.path);
-    return InventoryDocument(name: defaultName, path: file.path, updatedAt: now, itemCount: 0);
+    return InventoryDocument(
+        name: defaultName, path: file.path, updatedAt: now, itemCount: 0);
+  }
+
+  static Future<void> deleteDocument(String fullPath) async {
+    try {
+      final file = File(fullPath);
+      if (await file.exists()) {
+        await file.delete();
+        // После удаления тоже "пинаем" Android, чтобы файл исчез из проводника Windows
+        await notifyMediaScanner(fullPath);
+      }
+    } catch (e) {
+      debugPrint('Ошибка при удалении файла: $e');
+    }
   }
 
   static Future<List<ScannedItem>> loadDocumentItems(String path) async {
@@ -92,7 +111,8 @@ class DocumentStorageService {
     if (!await file.exists()) return [];
 
     try {
-      final data = jsonDecode(await file.readAsString()) as Map<String, dynamic>;
+      final data =
+          jsonDecode(await file.readAsString()) as Map<String, dynamic>;
       final items = (data['items'] as List<dynamic>? ?? const []);
 
       return items
@@ -131,7 +151,8 @@ class DocumentStorageService {
           .toList(),
     };
 
-    await file.writeAsString(const JsonEncoder.withIndent('  ').convert(payload));
+    await file
+        .writeAsString(const JsonEncoder.withIndent('  ').convert(payload));
     await notifyMediaScanner(file.path);
   }
 
@@ -139,20 +160,6 @@ class DocumentStorageService {
     final fullName = path.split(Platform.pathSeparator).last;
     final noExt = fullName.replaceAll(RegExp(r'\.json$'), '');
     return noExt.replaceAll('_', ' ');
-  }
-
-  static Future<void> deleteDocument(String fileName) async {
-    try {
-      final directory = await _getDocumentsFolder();
-      // Используем Platform.pathSeparator для надежности
-      final file = File('${directory.path}${Platform.pathSeparator}$fileName');
-      
-      if (await file.exists()) {
-        await file.delete();
-      }
-    } catch (e) {
-      debugPrint('Ошибка при удалении файла: $e');
-    }
   }
 
   static Future<void> notifyMediaScanner(String filePath) async {
