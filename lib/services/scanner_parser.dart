@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'package:flutter/foundation.dart';
 
 class ScannerParser {
   static Map<String, dynamic> parseRawCode(String rawCode) {

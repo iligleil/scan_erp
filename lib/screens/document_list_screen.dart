@@ -66,15 +66,65 @@ class _DocumentListScreenState extends State<DocumentListScreen> {
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                   itemBuilder: (context, index) {
                     final doc = _documents[index];
-                    return Card(
-                      child: ListTile(
-                        onTap: () => _openDocument(doc),
-                        leading: const Icon(Icons.description_outlined, color: Color(0xFF003387)),
-                        title: Text(doc.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                        subtitle: Text(
-                          'Позиций: ${doc.itemCount} · Обновлён: ${_formatDate(doc.updatedAt)}',
+                    // Используем doc.name вместо doc.id, так как имя файла уникально
+                    final String documentKey = doc.name; 
+
+                    return Dismissible(
+                      key: Key(documentKey), 
+                      direction: DismissDirection.endToStart,
+                      background: Container(
+                        alignment: Alignment.centerRight,
+                        padding: const EdgeInsets.only(right: 20.0),
+                        color: Colors.red,
+                        child: const Icon(Icons.delete, color: Colors.white),
+                      ),
+                      confirmDismiss: (direction) async {
+                        return await showDialog(
+                          context: context,
+                          builder: (context) => AlertDialog(
+                            title: const Text('Удалить документ?'),
+                            content: Text('Вы уверены, что хотите удалить "${doc.name}"?'),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.of(context).pop(false),
+                                child: const Text('ОТМЕНА'),
+                              ),
+                              TextButton(
+                                onPressed: () => Navigator.of(context).pop(true),
+                                child: const Text('УДАЛИТЬ', style: TextStyle(color: Colors.red)),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                      onDismissed: (direction) async {
+                        // Сохраняем имя для уведомления ДО удаления
+                        final deletedName = doc.name;
+
+                        // Удаляем через сервис (используем doc.name как идентификатор файла)
+                        await DocumentStorageService.deleteDocument(doc.name);
+                        
+                        setState(() {
+                          _documents.removeAt(index);
+                        });
+
+                        // Проверка mounted для исправления ошибки BuildContext
+                        if (!mounted) return;
+                        
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Документ "$deletedName" удален')),
+                        );
+                      },
+                      child: Card(
+                        child: ListTile(
+                          onTap: () => _openDocument(doc),
+                          leading: const Icon(Icons.description_outlined, color: Color(0xFF003387)),
+                          title: Text(doc.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                          subtitle: Text(
+                            'Позиций: ${doc.itemCount} · Обновлён: ${_formatDate(doc.updatedAt)}',
+                          ),
+                          trailing: const Icon(Icons.chevron_right),
                         ),
-                        trailing: const Icon(Icons.chevron_right),
                       ),
                     );
                   },

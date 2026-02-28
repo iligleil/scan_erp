@@ -1,21 +1,35 @@
 import 'dart:convert';
 import 'dart:io';
-
 import 'package:path_provider/path_provider.dart';
-
+import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import '../models/inventory_document.dart';
 import '../models/scanned_item.dart';
 
 class DocumentStorageService {
-  static const String _documentsFolderName = 'scan_erp_documents';
+  static const String _folderName = 'Inventory_ERP';
+  static const _channel = MethodChannel('scan_erp/media_scanner');
+
+  static Future<Directory> _getPublicFolder() async {
+    Directory? baseDir;
+    
+    if (Platform.isAndroid) {
+      // Путь, который 100% виден через USB (папка Загрузки)
+      baseDir = Directory('/storage/emulated/0/Download/$_folderName');
+    } else {
+      // Для iOS или эмулятора используем стандарт
+      final appDir = await getApplicationDocumentsDirectory();
+      baseDir = Directory('${appDir.path}${Platform.pathSeparator}$_folderName');
+    }
+
+    if (!await baseDir.exists()) {
+      await baseDir.create(recursive: true);
+    }
+    return baseDir;
+  }
 
   static Future<Directory> _getDocumentsFolder() async {
-    final baseDir = await getApplicationDocumentsDirectory();
-    final folder = Directory('${baseDir.path}${Platform.pathSeparator}$_documentsFolderName');
-    if (!await folder.exists()) {
-      await folder.create(recursive: true);
-    }
-    return folder;
+    return await _getPublicFolder();
   }
 
   static Future<List<InventoryDocument>> listDocuments() async {
@@ -69,6 +83,7 @@ class DocumentStorageService {
       }),
     );
 
+    await notifyMediaScanner(file.path);
     return InventoryDocument(name: defaultName, path: file.path, updatedAt: now, itemCount: 0);
   }
 
@@ -117,11 +132,34 @@ class DocumentStorageService {
     };
 
     await file.writeAsString(const JsonEncoder.withIndent('  ').convert(payload));
+    await notifyMediaScanner(file.path);
   }
 
   static String _fileNameToTitle(String path) {
     final fullName = path.split(Platform.pathSeparator).last;
     final noExt = fullName.replaceAll(RegExp(r'\.json$'), '');
     return noExt.replaceAll('_', ' ');
+  }
+
+  static Future<void> deleteDocument(String fileName) async {
+    try {
+      final directory = await _getDocumentsFolder();
+      // Используем Platform.pathSeparator для надежности
+      final file = File('${directory.path}${Platform.pathSeparator}$fileName');
+      
+      if (await file.exists()) {
+        await file.delete();
+      }
+    } catch (e) {
+      debugPrint('Ошибка при удалении файла: $e');
+    }
+  }
+
+  static Future<void> notifyMediaScanner(String filePath) async {
+    try {
+      await _channel.invokeMethod('scanFile', {'path': filePath});
+    } catch (e) {
+      debugPrint("Не удалось уведомить MediaScanner: $e");
+    }
   }
 }

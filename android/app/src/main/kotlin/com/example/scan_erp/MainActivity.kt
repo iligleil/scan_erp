@@ -4,14 +4,19 @@ import android.content.ClipData
 import android.content.ClipDescription
 import android.content.ClipboardManager
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import android.os.Build
 import android.os.PersistableBundle
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.EventChannel
+import io.flutter.plugin.common.MethodChannel
+import java.io.File
 
 class MainActivity : FlutterActivity(), EventChannel.StreamHandler {
     private val clipboardChannel = "scan_erp/clipboard_stream"
+    private val scannerChannel = "scan_erp/media_scanner" 
 
     private var clipboardManager: ClipboardManager? = null
     private var events: EventChannel.EventSink? = null
@@ -31,6 +36,29 @@ class MainActivity : FlutterActivity(), EventChannel.StreamHandler {
         super.configureFlutterEngine(flutterEngine)
         EventChannel(flutterEngine.dartExecutor.binaryMessenger, clipboardChannel)
             .setStreamHandler(this)
+
+            MethodChannel(flutterEngine.dartExecutor.binaryMessenger, scannerChannel).setMethodCallHandler { call, result ->
+            if (call.method == "scanFile") {
+                val path = call.argument<String>("path")
+                if (path != null) {
+                    scanFile(path)
+                    result.success(null)
+                } else {
+                    result.error("INVALID_PATH", "Path is null", null)
+                }
+            } else {
+                result.notImplemented()
+            }
+        }
+    }
+    private fun scanFile(path: String) {
+        try {
+            val file = File(path)
+            val uri = Uri.fromFile(file)
+            val intent = Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, uri)
+            sendBroadcast(intent)
+        } catch (e: Exception) {
+        }
     }
 
     override fun onListen(arguments: Any?, eventSink: EventChannel.EventSink?) {
